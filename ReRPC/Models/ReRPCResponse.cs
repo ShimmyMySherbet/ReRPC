@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text;
+using Newtonsoft.Json;
 
 namespace ReRPC.Models
 {
@@ -11,11 +12,11 @@ namespace ReRPC.Models
 
 		public string? MethodName { get; }
 
-		public string[] Payloads { get; }
+		public byte[][] Payloads { get; }
 
 		public bool IsFault { get; }
 
-		public ReRPCResponse(uint messageID, string? methodName, string[] payloads, bool isFault)
+		public ReRPCResponse(uint messageID, string? methodName, byte[][] payloads, bool isFault)
 		{
 			MessageID = messageID;
 			MethodName = methodName;
@@ -30,7 +31,16 @@ namespace ReRPC.Models
 				return default;
 			}
 
-			return JsonConvert.DeserializeObject<T>(Payloads[index]);
+			var payload = Payloads[index];
+
+			if (payload is T t)
+			{
+				return t;
+			}
+
+			var payloadJson = Encoding.UTF8.GetString(payload);
+
+			return JsonConvert.DeserializeObject<T>(payloadJson);
 		}
 
 		public object ReadObject(Type type, int index)
@@ -40,17 +50,19 @@ namespace ReRPC.Models
 				return default!;
 			}
 
-			return JsonConvert.DeserializeObject(Payloads[index], type)!;
+			if (type == typeof(byte[]))
+			{
+				return Payloads[index];
+			}
+			var payload = Payloads[index];
+			var payloadJson = Encoding.UTF8.GetString(payload);
+
+			return JsonConvert.DeserializeObject(payloadJson, type)!;
 		}
 
 		public T? ReadResponse<T>()
 		{
-			if (Payloads.Length == 0)
-			{
-				return default;
-			}
-
-			return JsonConvert.DeserializeObject<T>(Payloads[0]);
+			return ReadObject<T>(0);
 		}
 	}
 }

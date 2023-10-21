@@ -18,6 +18,11 @@ namespace ReRPC
 		public event OnSocketFault? Faulted;
 
 		/// <summary>
+		/// <see langword="true"/> when the socket has faulted/disconnected, <see langword="false"/> otherwise.
+		/// </summary>
+		public bool IsFaulted { get; private set; }
+
+		/// <summary>
 		/// Raises when a local handler throws an unhandled exception
 		/// </summary>
 		public event OnSocketHandlerError? HandlerError;
@@ -27,8 +32,9 @@ namespace ReRPC
 		//	 0 => [IsResponse]
 		//   1+ =>
 		//  [Method Name] : 1-255 Bytes
-		// [Body length] : 2 Bytes (UShort)
-		// [Body] : 0+ Bytes (Protobuf)
+		// [Number of objects] : 2 Bytes
+		//   [object length] : 2 Bytes (UShort)
+		//   [object] : 0+ Bytes
 
 		private async Task ReadLoopWrapper(CancellationToken token)
 		{
@@ -98,7 +104,7 @@ namespace ReRPC
 
 				m_Debug?.Invoke($"[Read][{messageID}] Arguments: {count}, isFault: {isFault}");
 
-				var objects = new string[count];
+				var objects = new byte[count][];
 
 				for (int i = 0; i < count; i++)
 				{
@@ -127,11 +133,8 @@ namespace ReRPC
 
 					await m_Network.ReadAsync(payLoadBuffer, 0, payLoadBuffer.Length, token);
 
-					var payloadJson = Encoding.UTF8.GetString(payLoadBuffer);
-
 					m_Debug?.Invoke($"[Read][{messageID}|Arg{i}] Read Json");
-					objects[i] = payloadJson;
-
+					objects[i] = payLoadBuffer;
 				}
 
 				m_Debug?.Invoke($"[Read][{messageID}] Dispatching Message...");
@@ -154,7 +157,8 @@ namespace ReRPC
 					if (message.IsFault)
 					{
 						wait.SetException(new RPCRemoteException());
-					} else
+					}
+					else
 					{
 						wait.SetResult(message);
 					}
@@ -208,8 +212,6 @@ namespace ReRPC
 
 						m_MessageQueue.Enqueue(cancelResponse);
 						m_QueueSemaphore.Release();
-
-
 
 						HandlerError?.Invoke(handler, ex);
 
@@ -279,7 +281,6 @@ namespace ReRPC
 					argCount = byte.MaxValue;
 				}
 
-
 				singleByte[0] = argCount;
 
 				await m_Network.WriteAsync(singleByte, 0, 1, token);
@@ -295,11 +296,21 @@ namespace ReRPC
 					var argument = message.Arguments[i];
 					m_Debug?.Invoke($"[Write] Writing argument {i}");
 
-					var payloadJson = JsonConvert.SerializeObject(argument);
-					var payloadBuffer = Encoding.UTF8.GetBytes(payloadJson);
+					byte[] payloadBuffer;
 
-					var payloadLength = (ushort)payloadBuffer.Length;
-					var payloadLengthBuffer = BitConverter.GetBytes(payloadLength);
+					if (argument != null && argument is byte[] subBuffer)
+					{
+						// Transmit as raw byte buffer
+						payloadBuffer = subBuffer;
+					}
+					else
+					{
+
+						var payloadJson = JsonConvert.SerializeObject(argument);
+						payloadBuffer = Encoding.UTF8.GetBytes(payloadJson);
+					}
+
+					var payloadLengthBuffer = BitConverter.GetBytes((ushort)payloadBuffer.Length);
 
 					await m_Network.WriteAsync(payloadLengthBuffer, 0, payloadLengthBuffer.Length, token); // [Payload Length] : 2 Bytes
 					await m_Network.WriteAsync(payloadBuffer, 0, payloadBuffer.Length, token);             // [Payload] : [Payload Length] Bytes
@@ -314,7 +325,12 @@ namespace ReRPC
 		private void OnFault(Exception? exception = null)
 		{
 			Stop();
-			Faulted?.Invoke(this, exception);
+
+			if (!IsFaulted)
+			{
+				IsFaulted = true;
+				Faulted?.Invoke(this, exception);
+			}
 		}
 	}
 }

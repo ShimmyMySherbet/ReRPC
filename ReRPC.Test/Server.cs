@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using ReRPC.RPCBinding.Attributes;
 
 namespace ReRPC.Test
@@ -46,6 +47,18 @@ namespace ReRPC.Test
 		public ServerInstance(ReRPCClient rPC)
 		{
 			RPC = rPC;
+			RPC.Faulted += RPC_Faulted;
+			RPC.HandlerError += RPC_HandlerError;
+		}
+
+		private void RPC_HandlerError(Interfaces.IRPCHandler handler, Exception exception)
+		{
+			Console.WriteLine($"[Server] Handler {handler.Name} Faulted: {exception.Message}");
+		}
+
+		private void RPC_Faulted(ReRPCClient socket, Exception? exception)
+		{
+			Console.WriteLine($"[Server] Faulted");
 		}
 
 		[RPC]
@@ -81,7 +94,10 @@ namespace ReRPC.Test
 		}
 
 		[RPC]
-		public int Multiply(int a, int b) => a * b;
+		public int Multiply(int a, int b)
+		{
+			return a * b;
+		}
 
 		[RPC]
 		public Task<string> ThrowException()
@@ -89,5 +105,23 @@ namespace ReRPC.Test
 			throw new NotImplementedException();
 		}
 
+		[RPC]
+		public void Disconnect()
+		{
+			Console.WriteLine("Disconnecting...");
+			RPC.Dispose();
+		}
+
+		[RPC]
+		public byte[] ConvertToBuffer(string message)
+		{
+			return Encoding.UTF8.GetBytes(message);
+		}
+
+		[RPC]
+		public string ConvertToString(byte[] buffer)
+		{
+			return Encoding.UTF8.GetString(buffer);
+		}
 	}
 }

@@ -5,6 +5,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <PackageId>ShimmyMySherbet.ReRPC</PackageId>
+    <Title>ReRPC</Title>
+    <Authors>ShimmyMySherbet</Authors>
+    <Description>Yet another lightweight and versatile RPC Socket. Designed to be easy to use, and with KISS principles in mind.</Description>
+    <Copyright>ShimmyMySherbet</Copyright>
+    <PackageProjectUrl>https://github.com/ShimmyMySherbet/ReRPC</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ShimmyMySherbet/ReRPC</RepositoryUrl>
+    <PackageTags>RPC</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
